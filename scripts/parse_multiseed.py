@@ -47,7 +47,7 @@ for mode in ("balanced","late_low"):
   diffs.append(delta)
   effects.append(dict(seed=seed,mode=mode,row_minus_word_slack_ns=round(delta,6),
                       winner=("row" if delta>0.020 else "word" if delta<-.020 else "tie")))
- summary={"per_seed_effects":effects,"distinct_placements_per_arch_per_mode":len(seeds),
+summary={"per_seed_effects":effects,"distinct_placements_per_arch_per_mode":len(seeds),
    "mean_row_minus_word_ns":{m:statistics.mean(e["row_minus_word_slack_ns"] for e in effects if e["mode"]==m) for m in ("balanced","late_low")},
    "seed_count":len(seeds),
    "limitations":["clock is ideal; no CTS/IR/EM/DRC/LVS signoff","physically modified balanced vs late_low wrappers contain different numbers of buffers","small 32x8 standard-cell memory test","postroute extracted SPEF readback performed","no novel architecture-selection algorithm yet"]}

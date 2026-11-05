@@ -3,7 +3,9 @@ name: ORRAM independent three-seed physical validation
 on:
   push:
     branches: [main]
-    paths: [".github/workflows/multiseed-integration.yml"]
+    paths:
+      - ".github/workflows/multiseed-integration.yml"
+      - "scripts/parse_multiseed.py"
   workflow_dispatch:
 
 permissions:
