@@ -1,0 +1,57 @@
+name: ORRAM cross-size XOR placement-selector generalization
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/xor-selector-analysis.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recover previously routed physical test artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p recovered/memory32x8 recovered/memory32x16
+          gh run download 42078118809 --name orram-xor-generalization-42078118809 --dir recovered/memory32x8
+          gh run download 42078118831 --name orram-cross-size-xor-42078118831 --dir recovered/memory32x16
+          test -s recovered/memory32x8/integration/row/late_low/s11/routed_read_path.rpt
+          test -s recovered/memory32x16/integration/word/balanced/s37/routed_read_path.rpt
+      - name: Independently evaluate early placement rule without tuning
+        run: |
+          set -euo pipefail
+          python3 scripts/benchmark_selector.py recovered/memory32x8/integration
+          python3 scripts/benchmark_selector.py recovered/memory32x16/integration
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          base=Path('recovered')
+          s={}
+          for k in ['memory32x8','memory32x16']:
+            p=base/k/'integration/selector_benchmark/summary.json'
+            d=json.loads(p.read_text())
+            assert d['n_pairs']==6
+            s[k]={key:d[key] for key in ['n_pairs','early_choice_matches_oracle','mean_early_advantage_over_blind_ps','mean_early_oracle_regret_ps','mean_early_advantage_by_context_ps']}
+          s['all_correct']=sum(x['early_choice_matches_oracle'] for x in s.values()) if False else s['memory32x8']['early_choice_matches_oracle']+s['memory32x16']['early_choice_matches_oracle']
+          s['all_cases']=12
+          (base/'xor_selector_results.json').write_text(json.dumps(s,indent=2)+'\n')
+          print(json.dumps(s,indent=2))
+          PY
+      - name: Archive results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orram-xor-selector-crosssize-${{ github.run_id }}
+          path: |
+            recovered/memory32x8/integration/selector_benchmark/
+            recovered/memory32x16/integration/selector_benchmark/
+            recovered/xor_selector_results.json
+          retention-days: 90
