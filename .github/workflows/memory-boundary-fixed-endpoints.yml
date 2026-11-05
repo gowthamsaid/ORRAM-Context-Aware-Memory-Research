@@ -1,0 +1,34 @@
+name: ORRAM matched fixed capture endpoint boundary comparison
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/memory-boundary-fixed-endpoints.yml"
+      - "scripts/summarize_fixed_endpoint_suffix.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recover successful immutable suffix audit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p boundary
+          gh run download 42128198373 --name orram-memory-boundary-sensitivity-42128198373 --dir boundary
+          test -s boundary/boundary_suffix_paths.csv
+      - name: Compare row and word on identical data output endpoint
+        run: python3 scripts/summarize_fixed_endpoint_suffix.py boundary
+      - name: Archive comparisons
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orram-fixed-output-comparison-${{ github.run_id }}
+          path: boundary/fixed_endpoint_comparison.json
+          retention-days: 90
