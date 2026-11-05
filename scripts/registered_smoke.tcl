@@ -27,7 +27,7 @@ set_clock_uncertainty -hold 0.02 [get_clocks clk]
 # The seed option is not universal. Flag unsupported seeds explicitly.
 set seed_ok true
 if {[catch {global_placement -density 0.48 -seed $seed} detail]} {
-  if {[string first "unknown option" $detail] >= 0 || [string first "unrecognized" $detail] >= 0} {
+  if {[string first "unknown option" $detail] >= 0 || [string first "unrecognized" $detail] >= 0 || [string first "not a known keyword" $detail] >= 0} {
     puts "PLACEMENT_SEED_UNSUPPORTED: $detail"
     set seed_ok false
     global_placement -density 0.48
