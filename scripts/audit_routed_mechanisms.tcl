@@ -9,7 +9,7 @@ read_db "$root/routed.odb"
 read_sdc "$root/top.sdc"
 source "$platform/setRC.tcl"
 read_spef "$root/routed.spef"
-report_units > "$audit/units.txt"
+report_units
 set starts [get_cells -quiet {*addrff*}]
 set ends [get_cells -quiet {*capture*}]
 puts "MECHANISM_AUDIT endpoint_count launch=[llength $starts] capture=[llength $ends]"
