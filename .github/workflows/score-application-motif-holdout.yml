@@ -1,0 +1,40 @@
+name: ORRAM score frozen Liberty predictor on counter Gray holdout
+on:
+  workflow_run:
+    workflows: [ORRAM prospective counter and Gray physical holdout]
+    types: [completed]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  score:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore immutable predictions and registered physical evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          HOLDOUT_RUN: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          mkdir -p frozen physical/32x8 physical/32x16
+          gh run download 42132385070 --name orram-preplacement-liberty-frozen-42132385070 --dir frozen
+          gh run download "$HOLDOUT_RUN" --name "orram-application-motif-holdout-8-$HOLDOUT_RUN" --dir physical/32x8
+          gh run download "$HOLDOUT_RUN" --name "orram-application-motif-holdout-16-$HOLDOUT_RUN" --dir physical/32x16
+          test -s frozen/frozen/predictions.csv
+          test -s physical/32x16/integration/row/gray_decode/s23/routed.spef
+      - name: Quantify timing regret versus routed oracle
+        run: |
+          set -euo pipefail
+          python3 scripts/score_application_motif_holdout.py physical frozen/frozen/predictions.csv evaluation
+          cat evaluation/holdout_summary.json
+      - name: Preserve all successes and failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orram-liberty-producer-holdout-score-${{ github.run_id }}
+          path: evaluation/
+          retention-days: 90
