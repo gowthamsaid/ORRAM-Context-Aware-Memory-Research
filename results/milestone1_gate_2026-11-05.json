@@ -1,0 +1,32 @@
+{
+  "date": "2026-11-05",
+  "run_id": 42066620647,
+  "run_conclusion": "success",
+  "timing_model_gate": "FAIL",
+  "macro_boundary_gate": "BASIC_INTERFACE_PASS",
+  "structural_verilog_export": true,
+  "external_output_load_pf": [
+    0.005,
+    0.05,
+    0.5,
+    5
+  ],
+  "fixed_Q0_arrival_ns": {
+    "row": {
+      "min_load": 0.4753254,
+      "max_load": 0.4753254
+    },
+    "word": {
+      "min_load": 0.4498572,
+      "max_load": 0.4498572
+    }
+  },
+  "capacitance_at_output_stage_ff": 38.4661713,
+  "extracted_spef_bytes": {
+    "row": 452540,
+    "word": 440516
+  },
+  "extracted_timing_reconciled": false,
+  "scientific_hypothesis": "NOT_TESTED_AT_SYSTEM_LEVEL",
+  "recommendation": "Perform a single registered wrapper and SPEF re-import smoke test before 12 routed comparisons"
+}
