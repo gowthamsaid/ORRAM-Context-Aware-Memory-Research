@@ -1,0 +1,34 @@
+name: ORRAM cell-region routed critical-path decomposition
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/parse-mechanism-components.yml","scripts/parse_mechanism_components.py"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  parse:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retrieve immutable detailed STA evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          mkdir -p mechanism
+          gh run download 42125976002 --name orram-mechanism-audit-42125976002 --dir mechanism
+          test -s mechanism/32x16/word/late_low/s11/launch_2.rpt
+      - name: Decompose incremental critical-path delay
+        run: |
+          python3 scripts/parse_mechanism_components.py mechanism
+      - name: Archive independently parsed results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orram-mechanism-components-${{ github.run_id }}
+          path: |
+            mechanism/component_delay.csv
+            mechanism/component_summary.json
+          retention-days: 90
