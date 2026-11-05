@@ -22,8 +22,6 @@ generate_ram \
   -ver_layer {metal4 0.14 9} \
   -hor_layer {metal3 0.08 8} \
   -filler_cells {FILLCELL_X1 FILLCELL_X2 FILLCELL_X4 FILLCELL_X8} \
-  -tapcell TAPCELL_X1 \
-  -max_tap_dist 10 \
   -write_behavioral_verilog "$out/behavioral.v"
 write_def "$out/ram.def"
 write_db "$out/ram.odb"

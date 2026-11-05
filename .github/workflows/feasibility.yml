@@ -37,7 +37,6 @@ jobs:
           set -euo pipefail
           git clone --filter=blob:none https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts.git "$ORFS_DIR"
           git -C "$ORFS_DIR" checkout "$ORFS_REV"
-          git -C "$ORFS_DIR" submodule update --init --recursive --depth 1
           test "$(git -C "$ORFS_DIR" rev-parse HEAD)" = "$ORFS_REV"
           docker pull "$ORFS_IMAGE"
           docker image inspect "$ORFS_IMAGE" --format '{{.Id}}' | tee docker_image_id.txt
