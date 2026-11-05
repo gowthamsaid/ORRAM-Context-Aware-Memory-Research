@@ -1,0 +1,35 @@
+name: ORRAM frozen selector held-out audit
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/frozen-selector-holdout.yml", "scripts/evaluate_frozen_holdout.py"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download physically routed evidence
+        env:
+          GH_TOKEN: \${{ github.token }}
+          GH_REPO: \${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p recovered/train recovered/holdout
+          gh run download 42074091105 --name orram-routed-multiseed-42074091105 --dir recovered/train
+          gh run download 42074519388 --name orram-heldout-high-42074519388 --dir recovered/holdout
+          test -s recovered/train/integration/row/late_low/s11/routed_read_path.rpt
+          test -s recovered/holdout/integration/word/late_high/s37/routed_read_path.rpt
+      - name: Evaluate without retraining
+        run: python3 scripts/evaluate_frozen_holdout.py recovered/train/integration recovered/holdout/integration recovered/decision
+      - name: Publish full audit table
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orram-frozen-holdout-audit-\${{ github.run_id }}
+          path: recovered/decision/
+          retention-days: 90
