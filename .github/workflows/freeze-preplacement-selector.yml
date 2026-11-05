@@ -1,0 +1,35 @@
+name: ORRAM freeze preplacement selector before new physical holdouts
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/freeze-preplacement-selector.yml", "scripts/frozen_preplacement_predictor.py"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  freeze:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Obtain training-only 32x8 balanced per-address timing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p reference
+          gh run download 42128929892 --name orram-memory-sensitivity-three-seed-42128929892 --dir reference
+          test -s reference/boundary_suffix_paths.csv
+      - name: Freeze model decisions without inspecting heldout routed results
+        run: |
+          set -euo pipefail
+          python3 scripts/frozen_preplacement_predictor.py reference/boundary_suffix_paths.csv frozen
+          cat frozen/frozen_predictions.csv
+      - name: Preserve immutable predictor decisions
+        uses: actions/upload-artifact@v4
+        with:
+          name: orram-preplacement-frozen-${{ github.run_id }}
+          path: frozen/
+          retention-days: 90
