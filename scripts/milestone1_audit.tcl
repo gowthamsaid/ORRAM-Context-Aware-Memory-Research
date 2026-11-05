@@ -8,7 +8,7 @@ file mkdir $out
 read_liberty "$platform/lib/NangateOpenCellLibrary_typical.lib"
 read_db "/study/archive/results/$arch/ram.odb"
 source "$platform/setRC.tcl"
-report_units > "$out/units.rpt"
+report_units
 create_clock -name clk -period 2.0 [get_ports clk]
 set_input_delay 0.1 -clock clk [get_ports {addr_rw*}]
 set_input_delay 0.1 -clock clk [get_ports {D*}]
