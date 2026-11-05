@@ -1,0 +1,28 @@
+name: ORRAM mechanism report detailed inspection
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-mechanism-paths.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retrieve frozen per-address timing reports
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          mkdir -p evidence
+          gh run download 42125976002 --name orram-mechanism-audit-42125976002 --dir evidence
+          for mode in balanced late_low; do
+            for arch in row word; do
+              echo "===== 32x16 $mode $arch launch 2 ====="
+              sed -n '1,100p' "evidence/32x16/$arch/$mode/s11/launch_2.rpt"
+            done
+          done
