@@ -1,0 +1,67 @@
+name: ORRAM routed per-address timing mechanism audit
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/routed-mechanism-audit.yml"
+      - "scripts/audit_routed_mechanisms.tcl"
+      - "scripts/summarize_mechanism.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+env:
+  ORFS_REV: d056a2b304182bf76ff10653531165b1dd9848d4
+  ORFS_IMAGE: openroad/orfs@sha256:641c6870a2c64143464d46017dd25ab647900fd29dce502230a2db0682e69bc9
+jobs:
+  mechanism:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recover immutable source physical checkpoints
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p recovered/32x8 recovered/32x16
+          gh run download 42078118809 --name orram-xor-generalization-42078118809 --dir recovered/32x8
+          gh run download 42078118831 --name orram-cross-size-xor-42078118831 --dir recovered/32x16
+          test -s recovered/32x8/integration/row/late_low/s11/routed.odb
+          test -s recovered/32x16/integration/word/balanced/s11/routed.spef
+          sha256sum recovered/32x8/integration/row/late_low/s11/{routed.odb,routed.spef,top.sdc}
+      - name: Restore pinned OpenROAD environment
+        run: |
+          set -euo pipefail
+          git clone -q --filter=blob:none https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts.git /tmp/orfs
+          git -C /tmp/orfs checkout -q "$ORFS_REV"
+          docker pull -q "$ORFS_IMAGE"
+      - name: Recompute detailed STA from routed SPEF
+        run: |
+          set -euo pipefail
+          for size in 32x8 32x16; do
+            for mode in balanced late_low; do
+              for arch in row word; do
+                src="recovered/$size/integration/$arch/$mode/s11"
+                dst="mechanism/$size/$arch/$mode/s11"
+                mkdir -p "$dst"
+                docker run --rm --user "$(id -u):$(id -g)"                   -v /tmp/orfs/flow:/OpenROAD-flow-scripts/flow                   -v "$PWD:/study" -w /OpenROAD-flow-scripts/flow                   -e ORRAM_INTEGRATION_OUT="/study/$src"                   -e ORRAM_AUDIT_OUT="/study/$dst"                   "$ORFS_IMAGE"                   bash -lc 'source ../env.sh && openroad -exit /study/scripts/audit_routed_mechanisms.tcl'                   > "$dst/audit.log" 2>&1 || { tail -n 80 "$dst/audit.log"; exit 1; }
+                test -s "$dst/launch_0.rpt"
+                test -s "$dst/launch_4.rpt"
+                grep 'MECHANISM_AUDIT_PASS' "$dst/audit.log"
+              done
+            done
+          done
+      - name: Extract per-address findings and preserve raw reports
+        run: |
+          set -euo pipefail
+          python3 scripts/summarize_mechanism.py mechanism
+          cat mechanism/summary.json
+      - name: Archive mechanism audit with reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orram-mechanism-audit-${{ github.run_id }}
+          path: mechanism/
+          retention-days: 90
