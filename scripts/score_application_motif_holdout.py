@@ -50,7 +50,7 @@ summary=dict(
     "correct":sum(x["predicted"]==x["oracle"] for x in rows if x["context"]==ctx),
     "mean_regret_ps":statistics.mean(x["predictor_regret_ps"] for x in rows if x["context"]==ctx)} for ctx in ("binary_increment","gray_encode","gray_decode")},
  rows=rows,
- limitations="Hand-crafted XOR contexts; 32x16 and 32x8 tests are correlated; physical seed perturbations are not independent benchmark circuits; predictor uses calibrated routed 32x8 reference architecture models.")
+ limitations="Hand-coded counter and Gray-code motifs are structurally different from XOR delay padding, but are not independent industrial application RTL; two sizes share reference arcs and placement seeds are not independent workload samples.")
 (output/"holdout_summary.json").write_text(json.dumps(summary,indent=2)+"\n")
 print(json.dumps(summary,indent=2))
 assert len(rows)==12
