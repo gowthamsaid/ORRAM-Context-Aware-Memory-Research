@@ -13,8 +13,14 @@ create_clock -name clk -period 2.000 [get_ports clk]
 set_input_delay 0.10 -clock clk [get_ports {D*}]
 set_input_delay 0.10 -clock clk [get_ports {we*}]
 set addr_all [get_ports {addr_rw*}]
-set addr_low [get_ports {addr_rw?0? addr_rw?1?}]
-set addr_high [get_ports {addr_rw?3? addr_rw?4?}]
+set addr_low {}
+set addr_high {}
+foreach port $addr_all {
+  set port_name [get_full_name $port]
+  puts "ORRAM_CONTEXT_PORT: $port_name"
+  if {[regexp {^addr_rw\[[01]\]$} $port_name]} {lappend addr_low $port}
+  if {[regexp {^addr_rw\[[34]\]$} $port_name]} {lappend addr_high $port}
+}
 if {[llength $addr_all] != 5 || [llength $addr_low] != 2 || [llength $addr_high] != 2} {
   error "Address-bit selections invalid all=[llength $addr_all] low=[llength $addr_low] high=[llength $addr_high]"
 }
