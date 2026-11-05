@@ -24,17 +24,10 @@ set_load -pin_load 0.010 [get_ports {data_out*}]
 set_clock_uncertainty -setup 0.05 [get_clocks clk]
 set_clock_uncertainty -hold 0.02 [get_clocks clk]
 
-# The seed option is not universal. Flag unsupported seeds explicitly.
-set seed_ok true
-if {[catch {global_placement -density 0.48 -seed $seed} detail]} {
-  if {[string first "unknown option" $detail] >= 0 || [string first "unrecognized" $detail] >= 0 || [string first "not a known keyword" $detail] >= 0} {
-    puts "PLACEMENT_SEED_UNSUPPORTED: $detail"
-    set seed_ok false
-    global_placement -density 0.48
-  } else {error "Placement failed: $detail"}
-}
+# Pinned GPL has no seed interface. This run is explicitly UNSEEDED.
+global_placement -density 0.48
 set fh [open "$out/seed_status.txt" w]
-puts $fh [expr {$seed_ok ? "SEED_SUPPORTED" : "SEED_UNSUPPORTED"}]
+puts $fh "SEED_UNSUPPORTED; deterministic placement only"
 close $fh
 detailed_placement
 estimate_parasitics -placement
