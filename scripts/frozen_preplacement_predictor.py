@@ -10,7 +10,7 @@ no PDK slew/placement model, setup-time or power correction.
 """
 import argparse,csv,json
 from pathlib import Path
-from generate_preplacement_holdout import PROFILES
+PROFILES = {"late_high": [1,1,1,3,3], "late_mid": [1,1,3,1,1], "staggered": [2,1,3,1,2]}
 
 p=argparse.ArgumentParser()
 p.add_argument("training_csv",type=Path)
