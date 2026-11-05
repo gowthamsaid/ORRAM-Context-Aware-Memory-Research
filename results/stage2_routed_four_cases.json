@@ -1,0 +1,22 @@
+{
+  "run_id": 42071621647,
+  "status": "SUCCESS_NO_STATISTICAL_GATE",
+  "seed_count": 1,
+  "means_not_estimated": true,
+  "scenarios": [
+    {
+      "context": "balanced",
+      "row_slack_ns": 3.27339,
+      "word_slack_ns": 3.292158,
+      "delta_row_minus_word_ns": -0.018768
+    },
+    {
+      "context": "late_low",
+      "row_slack_ns": 3.235625,
+      "word_slack_ns": 3.2077,
+      "delta_row_minus_word_ns": 0.027925
+    }
+  ],
+  "preregistered_margin_ns": 0.02,
+  "robust_reversal": false
+}
