@@ -31,6 +31,7 @@ jobs:
           sed -i 's/RAM32x8/RAM32x16/g' scripts/check_architectures.py
           sed -i 's/RAM32x8/RAM32x16/g;s/\[7:0\]/[15:0]/g;s/range(8)/range(16)/g' scripts/independent_address_logic.py
           sed -i 's/\[llength \$captures\]!=8/[llength $captures]!=16/g' scripts/registered_smoke.tcl scripts/routed_integration.tcl
+          sed -i 's/\[llength \$outputs\]!=8/[llength $outputs]!=16/g' scripts/milestone1_audit.tcl
           python3 scripts/independent_address_logic.py balanced wrapper/balanced.v
           python3 scripts/independent_address_logic.py late_low wrapper/late_low.v
           python3 -m py_compile scripts/parse_multiseed.py scripts/independent_address_logic.py
