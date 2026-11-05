@@ -13,8 +13,8 @@ create_clock -name clk -period 2.000 [get_ports clk]
 set_input_delay 0.10 -clock clk [get_ports {D*}]
 set_input_delay 0.10 -clock clk [get_ports {we*}]
 set addr_all [get_ports {addr_rw*}]
-set addr_low [get_ports -regexp {^addr_rw\[[01]\]$}]
-set addr_high [get_ports -regexp {^addr_rw\[[34]\]$}]
+set addr_low [get_ports {addr_rw?0? addr_rw?1?}]
+set addr_high [get_ports {addr_rw?3? addr_rw?4?}]
 if {[llength $addr_all] != 5 || [llength $addr_low] != 2 || [llength $addr_high] != 2} {
   error "Address-bit selections invalid all=[llength $addr_all] low=[llength $addr_low] high=[llength $addr_high]"
 }
