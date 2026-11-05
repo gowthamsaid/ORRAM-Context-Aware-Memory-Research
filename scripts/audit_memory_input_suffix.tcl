@@ -34,8 +34,8 @@ for {set bit 0} {$bit<5} {incr bit} {
  puts $fh [format {%d,%s,addr_mem[%d]} $bit $driver_name $bit]
  report_checks -through $driver -to $captures -path_delay max \
    -group_path_count 8 -fields $fields -digits 7 -no_line_splits \
-   > "$audit/address_$bit_worst.rpt"
- if {[file size "$audit/address_$bit_worst.rpt"]<350} {
+   > "$audit/address_${bit}_worst.rpt"
+ if {[file size "$audit/address_${bit}_worst.rpt"]<350} {
    error "No constrained path through $driver_name"
  }
  set targets {0 7}
@@ -45,8 +45,8 @@ for {set bit 0} {$bit<5} {incr bit} {
    if {[llength $capture]!=1} {error "No capture FF $q"}
    report_checks -through $driver -to $capture -path_delay max \
      -group_path_count 1 -fields $fields -digits 7 -no_line_splits \
-     > "$audit/address_$bit_q$q.rpt"
-   if {[file size "$audit/address_$bit_q$q.rpt"]<350} {
+     > "$audit/address_${bit}_q${q}.rpt"
+   if {[file size "$audit/address_${bit}_q${q}.rpt"]<350} {
      error "No constrained path through $driver_name to output Q$q"
    }
  }
