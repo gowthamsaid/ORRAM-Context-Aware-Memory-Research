@@ -1,4 +1,4 @@
-'timescale 1ns/1ps
+`timescale 1ns/1ps
 module tb;
   reg clk=0;
   reg [7:0] D;
