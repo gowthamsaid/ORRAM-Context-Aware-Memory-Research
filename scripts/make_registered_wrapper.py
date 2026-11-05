@@ -2,7 +2,7 @@
 """Generate functionally matched registered test wrappers. No synthesis."""
 from pathlib import Path
 import sys
-if len(sys.argv)!=3 or sys.argv[1] not in ("balanced","late_low"):
+if len(sys.argv)!=3 or sys.argv[1] not in ("balanced","late_low","late_high"):
     raise SystemExit("usage: make_registered_wrapper.py balanced|late_low FILE.v")
 mode=sys.argv[1];out=Path(sys.argv[2]);out.parent.mkdir(parents=True,exist_ok=True)
 lines=["module integrated_top(input clk, input [4:0] addr_in, input [7:0] data_in,",
@@ -11,7 +11,7 @@ lines=["module integrated_top(input clk, input [4:0] addr_in, input [7:0] data_i
 for i in range(5):
     lines.append(f"DFF_X1 u_addrff_{i} (.CK(clk), .D(addr_in[{i}]), .Q(addr_q[{i}]));")
 for i in range(5):
-    stages=5 if mode=="late_low" and i in (0,1) else 1
+    stages=5 if (mode=="late_low" and i in (0,1)) or (mode=="late_high" and i in (3,4)) else 1
     prev=f"addr_q[{i}]"
     for s in range(stages):
         nxt=f"b_{i}_{s}" if s<stages-1 else f"addr_mem[{i}]"
