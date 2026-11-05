@@ -24,10 +24,11 @@ set_load -pin_load 0.010 [get_ports {data_out*}]
 set_clock_uncertainty -setup 0.05 [get_clocks clk]
 set_clock_uncertainty -hold 0.02 [get_clocks clk]
 
-# Pinned GPL has no seed interface. This run is explicitly UNSEEDED.
-global_placement -density 0.48
+# Independent GPL perturbations; explicit seed and displacement (nm).
+# The generated DEF placement coordinates must differ to count as independent.
+global_placement -density 0.48 -random_seed $seed -perturb_dist 2000
 set fh [open "$out/seed_status.txt" w]
-puts $fh "SEED_UNSUPPORTED; deterministic placement only"
+puts $fh "SEED_SUPPORTED:$seed"
 close $fh
 detailed_placement
 estimate_parasitics -placement

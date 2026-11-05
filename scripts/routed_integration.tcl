@@ -2,7 +2,7 @@
 set arch $::env(ORRAM_VARIANT)
 set mode $::env(ORRAM_WRAPPER)
 if {$arch ni {row word} || $mode ni {balanced late_low}} {error "invalid architecture or wrapper"}
-set out "/study/integration/$arch/$mode"
+set out $::env(ORRAM_INTEGRATION_OUT)
 set platform /OpenROAD-flow-scripts/flow/platforms/nangate45
 read_liberty "$platform/lib/NangateOpenCellLibrary_typical.lib"
 read_db "$out/placed.odb"

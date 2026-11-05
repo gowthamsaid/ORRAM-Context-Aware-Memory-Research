@@ -1,0 +1,89 @@
+name: ORRAM independent three-seed physical validation
+
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/multiseed-integration.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+env:
+  ORFS_REV: d056a2b304182bf76ff10653531165b1dd9848d4
+  ORFS_IMAGE: openroad/orfs@sha256:641c6870a2c64143464d46017dd25ab647900fd29dce502230a2db0682e69bc9
+
+jobs:
+  physical-repeatability:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reuse already validated functional and physical memory variants
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir archive archive_audit wrapper integration
+          gh run download 42053883466 --name orram-feasibility-42053883466 --dir archive
+          gh run download 42066620647 --name milestone1-model-audit-42066620647 --dir archive_audit
+          for arch in row word; do
+            mkdir -p "archive/results/$arch"
+            cp "archive_audit/$arch/ram_structural.v" "archive/results/$arch/ram_structural.v"
+          done
+          python3 scripts/make_registered_wrapper.py balanced wrapper/balanced.v
+          python3 scripts/make_registered_wrapper.py late_low wrapper/late_low.v
+          python3 -m py_compile scripts/parse_multiseed.py scripts/make_registered_wrapper.py
+      - name: Rebuild pinned environment
+        run: |
+          set -euo pipefail
+          git clone -q --filter=blob:none https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts.git /tmp/orfs
+          git -C /tmp/orfs checkout -q "$ORFS_REV"
+          docker pull -q "$ORFS_IMAGE"
+      - name: Three explicitly seeded matched implementations per configuration
+        run: |
+          set -euo pipefail
+          for seed in 11 23 37; do
+            for mode in balanced late_low; do
+              for arch in row word; do
+                folder="integration/$arch/$mode/s$seed"
+                mkdir -p "$folder"
+                docker run --rm --user "$(id -u):$(id -g)" \
+                  -v /tmp/orfs/flow:/OpenROAD-flow-scripts/flow \
+                  -v "$PWD:/study" -w /OpenROAD-flow-scripts/flow \
+                  -e ORRAM_VARIANT="$arch" -e ORRAM_WRAPPER="$mode" \
+                  -e ORRAM_SEED="$seed" \
+                  -e ORRAM_INTEGRATION_OUT="/study/$folder" "$ORFS_IMAGE" \
+                  bash -lc 'source ../env.sh && openroad -exit /study/scripts/registered_smoke.tcl' \
+                  > "$folder/placement.log" 2>&1 || {
+                    tail -n 120 "$folder/placement.log"
+                    exit 1
+                  }
+                test -s "$folder/placed.def"
+                docker run --rm --user "$(id -u):$(id -g)" \
+                  -v /tmp/orfs/flow:/OpenROAD-flow-scripts/flow \
+                  -v "$PWD:/study" -w /OpenROAD-flow-scripts/flow \
+                  -e ORRAM_VARIANT="$arch" -e ORRAM_WRAPPER="$mode" \
+                  -e ORRAM_INTEGRATION_OUT="/study/$folder" "$ORFS_IMAGE" \
+                  bash -lc 'source ../env.sh && openroad -exit /study/scripts/routed_integration.tcl' \
+                  > "$folder/routing.log" 2>&1 || {
+                    tail -n 120 "$folder/routing.log"
+                    exit 1
+                  }
+                test -s "$folder/routed.spef"
+              done
+            done
+          done
+          python3 scripts/parse_multiseed.py integration
+          cat integration/multi_seed_summary/summary.json
+      - name: Archive every checkpoint and statistical table
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orram-routed-multiseed-${{ github.run_id }}
+          path: |
+            integration/
+            wrapper/
+          if-no-files-found: warn
+          retention-days: 90
