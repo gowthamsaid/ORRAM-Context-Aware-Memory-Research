@@ -1,0 +1,40 @@
+name: ORRAM score frozen predictor versus postroute holdout oracle
+on:
+  workflow_run:
+    workflows: [ORRAM locked XOR holdout physical implementations]
+    types: [completed]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  score:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recover frozen predictions and unseen physical results
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          HOLDOUT_RUN: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          mkdir -p frozen physical/32x8 physical/32x16
+          gh run download 42130789146 --name orram-preplacement-frozen-42130789146 --dir frozen
+          gh run download "$HOLDOUT_RUN" --name "orram-frozen-holdout-8-$HOLDOUT_RUN" --dir physical/32x8
+          gh run download "$HOLDOUT_RUN" --name "orram-frozen-holdout-16-$HOLDOUT_RUN" --dir physical/32x16
+          test -s frozen/frozen_predictions.csv
+          test -s physical/32x16/integration/word/late_mid/s23/routed.spef
+      - name: Compare frozen predictions against 12 independent routed comparisons
+        run: |
+          set -euo pipefail
+          python3 scripts/score_frozen_preplacement_holdout.py physical frozen/frozen_predictions.csv evaluation
+          cat evaluation/holdout_summary.json
+      - name: Archive score table and honest failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orram-preplacement-holdout-score-${{ github.run_id }}
+          path: evaluation/
+          retention-days: 90
