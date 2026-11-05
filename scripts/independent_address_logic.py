@@ -22,7 +22,7 @@ for i in range(5):
   if j!=depth-1:s.append(f'wire {nxt};')
   # Genuine XOR logic with varied signal inputs, not a BUF delay chain.
   other=f'addr_q[{(i+j+1)%5}]'
-  s.append(f'XOR2_X1 u_mix_{i}_{j} (.A({last}),.B({other}),.ZN({nxt}));')
+  s.append(f'XOR2_X1 u_mix_{i}_{j} (.A({last}),.B({other}),.Z({nxt}));')
   last=nxt
 s.append('RAM32x8 u_ram(.clk(clk),.D(data_in),.Q(mem_q),.addr_rw(addr_mem),.we(write_enable));')
 for i in range(8):
