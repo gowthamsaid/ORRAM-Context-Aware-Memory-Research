@@ -1,0 +1,64 @@
+name: ORRAM placement selector implementation-overhead audit
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/selection-cost-audit.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retrieve archived physical implementation logs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p archives/32x8 archives/32x16
+          gh run download 42078118809 --name orram-xor-generalization-42078118809 --dir archives/32x8
+          gh run download 42078118831 --name orram-cross-size-xor-42078118831 --dir archives/32x16
+      - name: Inventory operation counts and runtime markers
+        run: |
+          python3 - <<'PY'
+          import re,json,statistics
+          from pathlib import Path
+          result={}
+          for size in ['32x8','32x16']:
+            root=Path('archives')/size/'integration'
+            p=[];r=[];samples=[]
+            for arch in ['row','word']:
+              for mode in ['balanced','late_low']:
+                for seed in [11,23,37]:
+                  d=root/arch/mode/('s'+str(seed))
+                  rec={'arch':arch,'context':mode,'seed':seed}
+                  for typ,name in [('place','placement.log'),('route','routing.log')]:
+                    text=(d/name).read_text()
+                    matches=re.findall(r'Elapsed time:\s*([^\r\n]+)',text,re.I)
+                    rec[typ+'_runtime_markers']=matches[-5:]
+                    rec[typ+'_log_bytes']=len(text)
+                    if not text:raise RuntimeError('missing '+str(d/name))
+                  samples.append(rec)
+            result[size]={'physical_placements':12,'detailed_routes':12,'samples':samples}
+          result['comparison_accounting']={
+            'word_blind_baseline':'one candidate placement plus one route per configuration',
+            'current_early_selector':'two candidate placements plus one selected-candidate route per configuration',
+            'full_route_oracle':'two candidate placements plus two routes per configuration',
+            'extra_placement_vs_blind':1,
+            'route_saved_vs_exhaustive_oracle':1,
+            'note':'No end-to-end cost benefit claimed; CI runners and logs do not constitute controlled runtime benchmark.'
+          }
+          Path('selection_cost_audit.json').write_text(json.dumps(result,indent=2)+'\n')
+          print(json.dumps({k:{'physical_placements':v['physical_placements'],'detailed_routes':v['detailed_routes'],'runtime_marker_example':v['samples'][0]['route_runtime_markers']} for k,v in result.items() if k in ('32x8','32x16')},indent=2))
+          PY
+      - name: Archive cost evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orram-selection-cost-audit-${{ github.run_id }}
+          path: selection_cost_audit.json
+          retention-days: 90
