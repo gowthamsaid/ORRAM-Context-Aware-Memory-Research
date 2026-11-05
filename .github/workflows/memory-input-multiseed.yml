@@ -1,0 +1,66 @@
+name: ORRAM three-seed memory-address pin sensitivity validation
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/memory-input-multiseed.yml"
+      - "scripts/summarize_memory_input_suffix_multiseed.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+env:
+  ORFS_REV: d056a2b304182bf76ff10653531165b1dd9848d4
+  ORFS_IMAGE: openroad/orfs@sha256:641c6870a2c64143464d46017dd25ab647900fd29dce502230a2db0682e69bc9
+jobs:
+  validation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recover existing independently seeded routed checkpoints
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p recovered/32x8 recovered/32x16
+          gh run download 42078118809 --name orram-xor-generalization-42078118809 --dir recovered/32x8
+          gh run download 42078118831 --name orram-cross-size-xor-42078118831 --dir recovered/32x16
+      - name: Reuse pinned OpenROAD and OpenSTA environment
+        run: |
+          git clone -q --filter=blob:none https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts.git /tmp/orfs
+          git -C /tmp/orfs checkout -q "$ORFS_REV"
+          docker pull -q "$ORFS_IMAGE"
+      - name: Three-seed per-address fixed endpoint study
+        run: |
+          set -euo pipefail
+          for size in 32x8 32x16; do
+            for mode in balanced late_low; do
+              for arch in row word; do
+                for seed in 11 23 37; do
+                  src="recovered/$size/integration/$arch/$mode/s$seed"
+                  dst="boundary/$size/$arch/$mode/s$seed"
+                  mkdir -p "$dst"
+                  docker run --rm --user "$(id -u):$(id -g)" \
+                    -v /tmp/orfs/flow:/OpenROAD-flow-scripts/flow \
+                    -v "$PWD:/study" -w /OpenROAD-flow-scripts/flow \
+                    -e ORRAM_INTEGRATION_OUT="/study/$src" \
+                    -e ORRAM_AUDIT_OUT="/study/$dst" \
+                    -e ORRAM_WRAPPER="$mode" -e ORRAM_SIZE="$size" \
+                    "$ORFS_IMAGE" \
+                    bash -lc 'source ../env.sh && openroad -exit /study/scripts/audit_memory_input_suffix.tcl' \
+                    > "$dst/audit.log" 2>&1 || { tail -n 80 "$dst/audit.log"; exit 1; }
+                  grep 'ORRAM_BOUNDARY_MECHANISM_PASS' "$dst/audit.log"
+                done
+              done
+            done
+          done
+          python3 scripts/summarize_memory_input_suffix_multiseed.py boundary
+      - name: Archive three-seed physical sensitivity
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orram-memory-sensitivity-three-seed-${{ github.run_id }}
+          path: boundary/
+          retention-days: 90
