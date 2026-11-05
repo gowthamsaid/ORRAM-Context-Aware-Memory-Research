@@ -1,0 +1,125 @@
+name: ORRAM locked XOR holdout physical implementations
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/preplacement-holdout-physical.yml"
+      - "scripts/parse_multiseed.py"
+      - "scripts/generate_preplacement_holdout.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+env:
+  ORFS_REV: d056a2b304182bf76ff10653531165b1dd9848d4
+  ORFS_IMAGE: openroad/orfs@sha256:641c6870a2c64143464d46017dd25ab647900fd29dce502230a2db0682e69bc9
+
+jobs:
+  physical-repeatability:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        word_size: [8, 16]
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build independent wrapper sources and validate scripts
+        run: |
+          set -euo pipefail
+          mkdir -p wrapper integration archive/results
+          # Pinned predictions: workflow 42130789146.
+          if [ '${{ matrix.word_size }}' = '16' ]; then
+          sed -i 's/RAM32x8/RAM32x16/g;s/-word_size 8/-word_size 16/g;s/-mask_size 8/-mask_size 16/g' scripts/generate_ram.tcl
+          sed -i 's/RAM32x8/RAM32x16/g' scripts/check_architectures.py
+          sed -i 's/RAM32x8/RAM32x16/g;s/\[7:0\]/[15:0]/g;s/range(8)/range(16)/g' scripts/generate_preplacement_holdout.py
+          sed -i 's/\[llength \$captures\]!=8/[llength $captures]!=16/g' scripts/registered_smoke.tcl scripts/routed_integration.tcl
+          sed -i 's/\[llength \$outputs\]!=8/[llength $outputs]!=16/g' scripts/milestone1_audit.tcl
+          fi
+          sed -i 's/{balanced late_low late_high}/{balanced late_low late_high late_mid staggered}/g' scripts/registered_smoke.tcl scripts/routed_integration.tcl
+          for mode in late_high late_mid staggered; do
+            python3 scripts/generate_preplacement_holdout.py "$mode" '${{ matrix.word_size }}' "wrapper/$mode.v"
+          done
+          python3 -m py_compile scripts/generate_preplacement_holdout.py
+      - name: Rebuild pinned environment
+        run: |
+          set -euo pipefail
+          git clone -q --filter=blob:none https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts.git /tmp/orfs
+          git -C /tmp/orfs checkout -q "$ORFS_REV"
+          docker pull -q "$ORFS_IMAGE"
+      - name: Rebuild ORRAM physical memories locally rather than downloading Actions artifacts
+        run: |
+          set -euo pipefail
+          for arch in row word; do
+            mkdir -p "archive/results/$arch" "audit/$arch"
+            docker run --rm --user "$(id -u):$(id -g)" \
+              -v /tmp/orfs/flow:/OpenROAD-flow-scripts/flow \
+              -v "$PWD:/study" -w /OpenROAD-flow-scripts/flow \
+              -e ORRAM_VARIANT="$arch" \
+              -e ORRAM_OUTPUT_DIR="/study/archive/results/$arch" "$ORFS_IMAGE" \
+              bash -lc 'source ../env.sh && openroad -exit /study/scripts/generate_ram.tcl' \
+              > "archive/results/$arch/generation.log" 2>&1 || {
+                tail -n 120 "archive/results/$arch/generation.log"
+                exit 1
+              }
+            docker run --rm --user "$(id -u):$(id -g)" \
+              -v /tmp/orfs/flow:/OpenROAD-flow-scripts/flow \
+              -v "$PWD:/study" -w /OpenROAD-flow-scripts/flow \
+              -e ORRAM_VARIANT="$arch" "$ORFS_IMAGE" \
+              bash -lc 'source ../env.sh && openroad -exit /study/scripts/milestone1_audit.tcl' \
+              > "audit/$arch/console.log" 2>&1 || {
+                tail -n 120 "audit/$arch/console.log"
+                exit 1
+              }
+            cp "audit/$arch/ram_structural.v" "archive/results/$arch/ram_structural.v"
+            test -s "archive/results/$arch/ram_structural.v"
+          done
+          python3 scripts/check_architectures.py archive/results audit/contract
+          sha256sum archive/results/{row,word}/behavioral.v archive/results/{row,word}/ram_structural.v
+      - name: Three explicitly seeded matched implementations per configuration
+        run: |
+          set -euo pipefail
+          for seed in 11 23; do
+            for mode in late_high late_mid staggered; do
+              for arch in row word; do
+                folder="integration/$arch/$mode/s$seed"
+                mkdir -p "$folder"
+                docker run --rm --user "$(id -u):$(id -g)" \
+                  -v /tmp/orfs/flow:/OpenROAD-flow-scripts/flow \
+                  -v "$PWD:/study" -w /OpenROAD-flow-scripts/flow \
+                  -e ORRAM_VARIANT="$arch" -e ORRAM_WRAPPER="$mode" \
+                  -e ORRAM_SEED="$seed" \
+                  -e ORRAM_INTEGRATION_OUT="/study/$folder" "$ORFS_IMAGE" \
+                  bash -lc 'source ../env.sh && openroad -exit /study/scripts/registered_smoke.tcl' \
+                  > "$folder/placement.log" 2>&1 || {
+                    tail -n 120 "$folder/placement.log"
+                    exit 1
+                  }
+                test -s "$folder/placed.def"
+                docker run --rm --user "$(id -u):$(id -g)" \
+                  -v /tmp/orfs/flow:/OpenROAD-flow-scripts/flow \
+                  -v "$PWD:/study" -w /OpenROAD-flow-scripts/flow \
+                  -e ORRAM_VARIANT="$arch" -e ORRAM_WRAPPER="$mode" \
+                  -e ORRAM_INTEGRATION_OUT="/study/$folder" "$ORFS_IMAGE" \
+                  bash -lc 'source ../env.sh && openroad -exit /study/scripts/routed_integration.tcl' \
+                  > "$folder/routing.log" 2>&1 || {
+                    tail -n 120 "$folder/routing.log"
+                    exit 1
+                  }
+                test -s "$folder/routed.spef"
+              done
+            done
+          done
+          echo 'LOCKED_HOLDOUT_COMPLETE'
+      - name: Archive every checkpoint and statistical table
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orram-frozen-holdout-${{ matrix.word_size }}-${{ github.run_id }}
+          path: |
+            integration/
+            wrapper/
+          if-no-files-found: warn
+          retention-days: 90
