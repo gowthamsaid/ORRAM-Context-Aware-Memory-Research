@@ -1,0 +1,72 @@
+name: ORRAM freeze realistic address-producer Liberty timing predictor
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/freeze-liberty-producer.yml"
+      - "scripts/generate_application_motifs.py"
+      - "scripts/producer_preplacement_sta.tcl"
+      - "scripts/freeze_liberty_producer_predictor.py"
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+env:
+  ORFS_REV: d056a2b304182bf76ff10653531165b1dd9848d4
+  ORFS_IMAGE: openroad/orfs@sha256:641c6870a2c64143464d46017dd25ab647900fd29dce502230a2db0682e69bc9
+jobs:
+  freeze:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retrieve reference calibration evidence only
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p calibration
+          gh run download 42128929892 --name orram-memory-sensitivity-three-seed-42128929892 --dir calibration
+          test -s calibration/boundary_suffix_paths.csv
+      - name: Generate three application-motif source cones
+        run: |
+          set -euo pipefail
+          for context in binary_increment gray_encode gray_decode; do
+            python3 scripts/generate_application_motifs.py "$context" 8 "wrapper/$context.v" "producer/$context.v"
+          done
+      - name: Rebuild pinned OpenROAD engine
+        run: |
+          set -euo pipefail
+          git clone -q --filter=blob:none https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts.git /tmp/orfs
+          git -C /tmp/orfs checkout -q "$ORFS_REV"
+          docker pull -q "$ORFS_IMAGE"
+      - name: Time only the isolated address producers before memory placement
+        run: |
+          set -euo pipefail
+          for context in binary_increment gray_encode gray_decode; do
+            mkdir -p "presta/$context"
+            docker run --rm --user "$(id -u):$(id -g)" \
+              -v /tmp/orfs/flow:/OpenROAD-flow-scripts/flow \
+              -v "$PWD:/study" -w /OpenROAD-flow-scripts/flow \
+              -e PRODUCER_DESIGN="/study/producer/$context.v" \
+              -e PRODUCER_STA_OUT="/study/presta/$context" "$ORFS_IMAGE" \
+              bash -lc 'source ../env.sh && openroad -exit /study/scripts/producer_preplacement_sta.tcl' \
+              > "presta/$context/sta.log" 2>&1 || { tail -n 100 "presta/$context/sta.log"; exit 1; }
+            grep "PRODUCER_PREPLACEMENT_STA_PASS" "presta/$context/sta.log"
+          done
+      - name: Freeze timing model and all six width/context predictions
+        run: |
+          set -euo pipefail
+          python3 scripts/freeze_liberty_producer_predictor.py calibration/boundary_suffix_paths.csv presta frozen
+          cat frozen/predictions.csv
+      - name: Archive preplacement predictions and source cones before physical validation
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orram-preplacement-liberty-frozen-${{ github.run_id }}
+          path: |
+            producer/
+            presta/
+            frozen/
+          retention-days: 90
