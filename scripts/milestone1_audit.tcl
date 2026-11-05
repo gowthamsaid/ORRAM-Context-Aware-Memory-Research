@@ -28,12 +28,12 @@ foreach load {0.005 0.050 0.500 5.000} {
   set_load -pin_load $load $outputs
   report_checks -from $inputs -to $outputs -path_delay max \
     -group_path_count 1 -fields {input_pin net capacitance fanout slew} \
-    -digits 7 -no_line_splits > "$out/load_function () { [native code] }_worst.rpt"
+    -digits 7 -no_line_splits > "$out/load_$load_worst.rpt"
   report_checks -from $inputs -to $q0 -path_delay max \
     -group_path_count 1 -fields {input_pin net capacitance fanout slew} \
-    -digits 7 -no_line_splits > "$out/load_function () { [native code] }_q0.rpt"
-  write_sdc "$out/load_function () { [native code] }.sdc"
-  puts "M1_LOAD arch=$arch value=$load bytes=[file size $out/load_function () { [native code] }_q0.rpt]"
+    -digits 7 -no_line_splits > "$out/load_$load_q0.rpt"
+  write_sdc "$out/load_$load.sdc"
+  puts "M1_LOAD arch=$arch value=$load bytes=[file size $out/load_$load_q0.rpt]"
 }
 
 # Export technology-mapped gates and physical block as distinct integration options.
