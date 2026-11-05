@@ -19,8 +19,8 @@ generate_ram \
   -column_mux_ratio 1 \
   -storage_cell DFF_X1 \
   -routing_layer {metal1 0.08} \
-  -ver_layer {metal4 0.14 9} \
-  -hor_layer {metal3 0.08 8} \
+  -ver_layer {metal4 0.14 20} \
+  -hor_layer {metal3 0.08 20} \
   -filler_cells {FILLCELL_X1 FILLCELL_X2 FILLCELL_X4 FILLCELL_X8} \
   -write_behavioral_verilog "$out/behavioral.v"
 write_def "$out/ram.def"
