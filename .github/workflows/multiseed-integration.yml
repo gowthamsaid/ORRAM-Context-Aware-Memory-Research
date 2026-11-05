@@ -19,19 +19,10 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
-      - name: Reuse already validated functional and physical memory variants
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
+      - name: Build independent wrapper sources and validate scripts
         run: |
           set -euo pipefail
-          mkdir archive archive_audit wrapper integration
-          gh run download 42053883466 --name orram-feasibility-42053883466 --dir archive
-          gh run download 42066620647 --name milestone1-model-audit-42066620647 --dir archive_audit
-          for arch in row word; do
-            mkdir -p "archive/results/$arch"
-            cp "archive_audit/$arch/ram_structural.v" "archive/results/$arch/ram_structural.v"
-          done
+          mkdir -p wrapper integration archive/results
           python3 scripts/make_registered_wrapper.py balanced wrapper/balanced.v
           python3 scripts/make_registered_wrapper.py late_low wrapper/late_low.v
           python3 -m py_compile scripts/parse_multiseed.py scripts/make_registered_wrapper.py
@@ -41,6 +32,35 @@ jobs:
           git clone -q --filter=blob:none https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts.git /tmp/orfs
           git -C /tmp/orfs checkout -q "$ORFS_REV"
           docker pull -q "$ORFS_IMAGE"
+      - name: Rebuild ORRAM physical memories locally rather than downloading Actions artifacts
+        run: |
+          set -euo pipefail
+          for arch in row word; do
+            mkdir -p "archive/results/$arch" "audit/$arch"
+            docker run --rm --user "$(id -u):$(id -g)" \
+              -v /tmp/orfs/flow:/OpenROAD-flow-scripts/flow \
+              -v "$PWD:/study" -w /OpenROAD-flow-scripts/flow \
+              -e ORRAM_VARIANT="$arch" \
+              -e ORRAM_OUTPUT_DIR="/study/archive/results/$arch" "$ORFS_IMAGE" \
+              bash -lc 'source ../env.sh && openroad -exit /study/scripts/generate_ram.tcl' \
+              > "archive/results/$arch/generation.log" 2>&1 || {
+                tail -n 120 "archive/results/$arch/generation.log"
+                exit 1
+              }
+            docker run --rm --user "$(id -u):$(id -g)" \
+              -v /tmp/orfs/flow:/OpenROAD-flow-scripts/flow \
+              -v "$PWD:/study" -w /OpenROAD-flow-scripts/flow \
+              -e ORRAM_VARIANT="$arch" "$ORFS_IMAGE" \
+              bash -lc 'source ../env.sh && openroad -exit /study/scripts/milestone1_audit.tcl' \
+              > "audit/$arch/console.log" 2>&1 || {
+                tail -n 120 "audit/$arch/console.log"
+                exit 1
+              }
+            cp "audit/$arch/ram_structural.v" "archive/results/$arch/ram_structural.v"
+            test -s "archive/results/$arch/ram_structural.v"
+          done
+          python3 scripts/check_architectures.py archive/results audit/contract
+          sha256sum archive/results/{row,word}/behavioral.v archive/results/{row,word}/ram_structural.v
       - name: Three explicitly seeded matched implementations per configuration
         run: |
           set -euo pipefail
