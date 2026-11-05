@@ -1,4 +1,4 @@
-name: Registered ORRAM integration smoke
+name: Matched registered ORRAM physical comparison
 
 on:
   push:
@@ -7,6 +7,8 @@ on:
       - ".github/workflows/registered-integration.yml"
       - "scripts/registered_smoke.tcl"
       - "scripts/make_registered_wrapper.py"
+      - "scripts/routed_integration.tcl"
+      - "scripts/parse_registered_comparison.py"
   workflow_dispatch:
 
 permissions:
@@ -19,7 +21,7 @@ env:
 jobs:
   smoke:
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - name: Download original physical gates
@@ -45,23 +47,53 @@ jobs:
           git clone -q --filter=blob:none https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts.git /tmp/orfs
           git -C /tmp/orfs checkout -q "$ORFS_REV"
           docker pull -q "$ORFS_IMAGE"
-      - name: Implement first balanced registered pilot (no route yet)
+      - name: Matched placement of four registered architectures
         run: |
           set -euo pipefail
-          mkdir -p integration/row/balanced
-          docker run --rm --user "$(id -u):$(id -g)" \
-            -v /tmp/orfs/flow:/OpenROAD-flow-scripts/flow \
-            -v "$PWD:/study" -w /OpenROAD-flow-scripts/flow \
-            -e ORRAM_VARIANT=row -e ORRAM_WRAPPER=balanced \
-            -e ORRAM_INTEGRATION_OUT=/study/integration/row/balanced \
-            -e ORRAM_SEED=1 "$ORFS_IMAGE" \
-            bash -lc 'source ../env.sh && openroad -exit /study/scripts/registered_smoke.tcl' \
-            > integration/row/balanced/console.log 2>&1 || {
-              tail -n 120 integration/row/balanced/console.log
-              exit 1
-            }
-          test -s integration/row/balanced/read_reg_to_reg.rpt
-          cat integration/row/balanced/seed_status.txt
+          for arch in row word; do
+            for mode in balanced late_low; do
+              folder="integration/$arch/$mode"
+              mkdir -p "$folder"
+              docker run --rm --user "$(id -u):$(id -g)" \
+                -v /tmp/orfs/flow:/OpenROAD-flow-scripts/flow \
+                -v "$PWD:/study" -w /OpenROAD-flow-scripts/flow \
+                -e ORRAM_VARIANT="$arch" -e ORRAM_WRAPPER="$mode" \
+                -e ORRAM_INTEGRATION_OUT="/study/$folder" \
+                -e ORRAM_SEED=1 "$ORFS_IMAGE" \
+                bash -lc 'source ../env.sh && openroad -exit /study/scripts/registered_smoke.tcl' \
+                > "$folder/placement.log" 2>&1 || {
+                  tail -n 150 "$folder/placement.log"
+                  exit 1
+                }
+              test -s "$folder/read_reg_to_reg.rpt"
+              cat "$folder/seed_status.txt"
+            done
+          done
+      - name: Global and detailed routing plus extracted SPEF reimport
+        run: |
+          set -euo pipefail
+          for arch in row word; do
+            for mode in balanced late_low; do
+              folder="integration/$arch/$mode"
+              docker run --rm --user "$(id -u):$(id -g)" \
+                -v /tmp/orfs/flow:/OpenROAD-flow-scripts/flow \
+                -v "$PWD:/study" -w /OpenROAD-flow-scripts/flow \
+                -e ORRAM_VARIANT="$arch" -e ORRAM_WRAPPER="$mode" \
+                "$ORFS_IMAGE" \
+                bash -lc 'source ../env.sh && openroad -exit /study/scripts/routed_integration.tcl' \
+                > "$folder/routing.log" 2>&1 || {
+                  tail -n 150 "$folder/routing.log"
+                  exit 1
+                }
+              test -s "$folder/routed_read_path.rpt"
+              test -s "$folder/routed.spef"
+            done
+          done
+      - name: Cross-architecture physical measurement
+        run: |
+          set -euo pipefail
+          python3 scripts/parse_registered_comparison.py integration
+          cat integration/cross_comparison/summary.json
       - name: Archive diagnostics
         if: always()
         uses: actions/upload-artifact@v4
