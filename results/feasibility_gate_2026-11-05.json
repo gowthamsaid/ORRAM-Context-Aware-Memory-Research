@@ -1,0 +1,45 @@
+{
+  "research_gate": "CONDITIONAL_GO_TO_INTEGRATION",
+  "scientific_go": false,
+  "implemented_original_algorithm": false,
+  "run_id": 42053883466,
+  "size": "32x8",
+  "seed_count": 1,
+  "read_latency": "asynchronous_combinational",
+  "identical_behavior": true,
+  "structurally_distinct": true,
+  "equal_cell_histograms": true,
+  "slack_ns": {
+    "reference": {
+      "row": 1.42467,
+      "word": 1.45014
+    },
+    "late_addr_lowbits": {
+      "row": 0.92663,
+      "word": 0.90014
+    },
+    "late_addr_highbits": {
+      "row": 0.87467,
+      "word": 0.9017
+    },
+    "heavy_outputs": {
+      "row": 1.42467,
+      "word": 1.45014
+    },
+    "tight_output": {
+      "row": 0.77467,
+      "word": 0.80014
+    }
+  },
+  "reversal_lowbits": true,
+  "reference_word_advantage_ps": 25.47,
+  "late_lowbits_row_advantage_ps": 26.49,
+  "output_load_sensitivity_validated": false,
+  "requires": [
+    "real enclosing logic",
+    "top-level physical implementation",
+    "extracted parasitics",
+    "multi-seed confirmation",
+    "baseline and prior art comparison"
+  ]
+}
