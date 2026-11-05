@@ -1,0 +1,68 @@
+name: Milestone 1 ORRAM timing model and integration audit
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/milestone1-audit.yml"
+      - "scripts/milestone1_audit.tcl"
+      - "scripts/parse_milestone1.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  ORFS_REV: d056a2b304182bf76ff10653531165b1dd9848d4
+  ORFS_IMAGE: openroad/orfs@sha256:641c6870a2c64143464d46017dd25ab647900fd29dce502230a2db0682e69bc9
+
+jobs:
+  inspect-archive:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retrieve existing physical blocks (no regeneration)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir archive audit
+          gh run download 42053883466 --name orram-feasibility-42053883466 --dir archive
+          test -s archive/results/row/ram.odb
+          test -s archive/results/word/ram.odb
+          sha256sum archive/results/{row,word}/ram.odb > audit/archive-sha256.txt
+      - name: Recreate pinned environment
+        run: |
+          set -euo pipefail
+          git clone -q --filter=blob:none https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts.git /tmp/orfs
+          git -C /tmp/orfs checkout -q "$ORFS_REV"
+          docker pull -q "$ORFS_IMAGE"
+      - name: Timing and interface probes
+        run: |
+          set -euo pipefail
+          for arch in row word; do
+            mkdir -p "audit/$arch"
+            docker run --rm --user "$(id -u):$(id -g)" \
+              -v /tmp/orfs/flow:/OpenROAD-flow-scripts/flow \
+              -v "$PWD:/study" -w /OpenROAD-flow-scripts/flow \
+              -e ORRAM_VARIANT="$arch" "$ORFS_IMAGE" \
+              bash -lc 'source ../env.sh && openroad -exit /study/scripts/milestone1_audit.tcl' \
+              > "audit/$arch/console.log" 2>&1 || {
+                tail -n 100 "audit/$arch/console.log"
+                exit 1
+              }
+            test -s "audit/$arch/ram_structural.v"
+            test -s "audit/$arch/extraction_status.txt"
+          done
+          python3 scripts/parse_milestone1.py audit
+          cat audit/summary/audit.json
+      - name: Preserve exact evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: milestone1-model-audit-${{ github.run_id }}
+          path: audit/
+          if-no-files-found: warn
+          retention-days: 90
