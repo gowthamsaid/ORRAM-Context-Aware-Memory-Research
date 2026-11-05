@@ -1,0 +1,55 @@
+name: ORRAM early placement selector versus routed oracle
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/selector-benchmark.yml"
+      - "scripts/benchmark_selector.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  score-early-selector:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retrieve frozen twelve physical implementations
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p recovered
+          gh run download 42074091105 --name orram-routed-multiseed-42074091105 --dir recovered
+          test -s recovered/integration/row/balanced/s11/read_reg_to_reg.rpt
+          test -s recovered/integration/word/late_low/s37/routed_read_path.rpt
+          echo 'Source: https://github.com/gowthamsaid/ORRAM-Context-Aware-Memory-Research/actions/runs/42074091105'
+      - name: Evaluate placement-stage selector independently of routed oracle
+        run: |
+          set -euo pipefail
+          python3 scripts/benchmark_selector.py recovered/integration
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path("recovered/integration/selector_benchmark/summary.json")
+          d=json.loads(p.read_text())
+          assert d["n_pairs"]==6, d
+          assert len(d["rows"])==6
+          assert set(x["mode"] for x in d["rows"])=={"balanced","late_low"}
+          assert all(x["oracle_slack_ns"]+1e-9>=max(x["blind_slack_ns"],x["early_physical_slack_ns"]) for x in d["rows"])
+          assert all(x["early_oracle_regret_ps"]>=-0.001 for x in d["rows"])
+          print("SELECTOR_BENCHMARK_AUDIT_PASS")
+          PY
+      - name: Preserve benchmark table and decision evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orram-early-selector-benchmark-${{ github.run_id }}
+          path: recovered/integration/selector_benchmark/
+          if-no-files-found: warn
+          retention-days: 90
