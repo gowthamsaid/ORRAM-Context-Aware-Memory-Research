@@ -1,0 +1,96 @@
+name: ORRAM boundary-context feasibility
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: orram-feasibility-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  ORFS_REV: d056a2b304182bf76ff10653531165b1dd9848d4
+  ORFS_IMAGE: openroad/orfs@sha256:641c6870a2c64143464d46017dd25ab647900fd29dce502230a2db0682e69bc9
+  ORFS_DIR: /tmp/orram-orfs
+
+jobs:
+  feasibility:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check scripts before physical experiments
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/*.py
+          python3 -m unittest discover -s tests -v
+      - name: Install behavioral simulation
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y iverilog
+      - name: Pin OpenROAD and Nangate45 platform
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts.git "$ORFS_DIR"
+          git -C "$ORFS_DIR" checkout "$ORFS_REV"
+          git -C "$ORFS_DIR" submodule update --init --recursive --depth 1
+          test "$(git -C "$ORFS_DIR" rev-parse HEAD)" = "$ORFS_REV"
+          docker pull "$ORFS_IMAGE"
+          docker image inspect "$ORFS_IMAGE" --format '{{.Id}}' | tee docker_image_id.txt
+      - name: Generate two 32x8 standard-cell RAM architectures
+        run: |
+          set -euo pipefail
+          mkdir -p results
+          for arch in row word; do
+            mkdir -p "results/$arch"
+            docker run --rm --user "$(id -u):$(id -g)" \
+              -v "$ORFS_DIR/flow:/OpenROAD-flow-scripts/flow" \
+              -v "$PWD:/study" -w /OpenROAD-flow-scripts/flow \
+              -e ORRAM_VARIANT="$arch" \
+              -e ORRAM_OUTPUT_DIR="/study/results/$arch" \
+              "$ORFS_IMAGE" bash -lc 'source ../env.sh && openroad -exit /study/scripts/generate_ram.tcl' \
+              > "results/$arch/generation.log" 2>&1 || { tail -n 100 "results/$arch/generation.log"; exit 1; }
+            for f in behavioral.v ram.def ram.odb ram.lef; do test -s "results/$arch/$f"; done
+          done
+          python3 scripts/check_architectures.py results results/contract
+      - name: Independent behavioral testbench
+        run: |
+          set -euo pipefail
+          for arch in row word; do
+            iverilog -g2012 -o "results/$arch/sim.vvp" "results/$arch/behavioral.v" tb/ram32x8_tb.v
+            vvp "results/$arch/sim.vvp" | tee "results/$arch/behavioral-simulation.log"
+            grep -q BEHAVIORAL_PASS "results/$arch/behavioral-simulation.log"
+          done
+      - name: Test five timing boundary contexts on fixed blocks
+        run: |
+          set -euo pipefail
+          for arch in row word; do
+            for context in reference late_addr_lowbits late_addr_highbits heavy_outputs tight_output; do
+              folder="results/$arch/$context"
+              mkdir -p "$folder"
+              docker run --rm --user "$(id -u):$(id -g)" \
+                -v "$ORFS_DIR/flow:/OpenROAD-flow-scripts/flow" \
+                -v "$PWD:/study" -w /OpenROAD-flow-scripts/flow \
+                -e ORRAM_VARIANT="$arch" -e ORRAM_CONTEXT="$context" \
+                -e ORRAM_OUTPUT_DIR="/study/$folder" \
+                "$ORFS_IMAGE" bash -lc 'source ../env.sh && openroad -exit /study/scripts/timing_context.tcl' \
+                > "$folder/sta.log" 2>&1 || { tail -n 100 "$folder/sta.log"; exit 1; }
+              test -s "$folder/read_path.rpt"
+            done
+          done
+          python3 scripts/evaluate_context.py results results/evaluation
+          cat results/evaluation/REPORT.md
+      - name: Archive reports and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orram-feasibility-${{ github.run_id }}
+          path: |
+            results/
+            docker_image_id.txt
+          if-no-files-found: warn
+          retention-days: 90
