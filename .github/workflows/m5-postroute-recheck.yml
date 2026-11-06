@@ -1,0 +1,64 @@
+name: M5 ORRAM recheck postroute OpenSTA endpoint coverage
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/m5-postroute-recheck.yml", "scripts/m5_postroute_sta.tcl"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+env:
+  ORFS_REV: d056a2b304182bf76ff10653531165b1dd9848d4
+  ORFS_IMAGE: openroad/orfs@sha256:641c6870a2c64143464d46017dd25ab647900fd29dce502230a2db0682e69bc9
+jobs:
+  sta:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      matrix:
+        word_width: [8,16]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recover archived routed checkpoints unchanged
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p physical
+          gh run download 42139114830 --name "orram-synth-rtl-holdout-${{ matrix.word_width }}-42139114830" --dir physical
+          test -s physical/integration/row/ring24/s11/routed.odb
+      - name: Recreate exact pinned physical timing engine
+        run: |
+          set -euo pipefail
+          git clone -q --filter=blob:none https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts.git /tmp/orfs
+          git -C /tmp/orfs checkout -q "$ORFS_REV"
+          docker pull -q "$ORFS_IMAGE"
+      - name: Check all routing STA cases and preserve verbose setup coverage
+        run: |
+          set -euo pipefail
+          for mode in ring24 serpentine_tile dma_stride; do
+            for seed in 11 23; do
+              for arch in row word; do
+                from="physical/integration/$arch/$mode/s$seed"
+                dest="m5/${{ matrix.word_width }}/$arch/$mode/s$seed"
+                mkdir -p "$dest"
+                docker run --rm --user "$(id -u):$(id -g)" \
+                  -v /tmp/orfs/flow:/OpenROAD-flow-scripts/flow \
+                  -v "$PWD:/study" -w /OpenROAD-flow-scripts/flow \
+                  -e M5_CASE_DIR="/study/$from" -e M5_AUDIT_DIR="/study/$dest" \
+                  -e M5_WORD_WIDTH="${{ matrix.word_width }}" "$ORFS_IMAGE" \
+                  bash -lc 'source ../env.sh && openroad -exit /study/scripts/m5_postroute_sta.tcl' \
+                  > "$dest/audit.log" 2>&1 || { tail -n 110 "$dest/audit.log"; exit 1; }
+                grep "M5_POSTROUTE_RECHECK_PASS" "$dest/audit.log"
+              done
+            done
+          done
+      - name: Preserve exact evidence for independent review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orram-m5-postroute-${{ matrix.word_width }}-${{ github.run_id }}
+          path: m5/
+          retention-days: 90
