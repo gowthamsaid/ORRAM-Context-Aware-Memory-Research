@@ -12,6 +12,9 @@ if [[ "$word_size" == 16 ]]; then
 fi
 sed -i 's/{balanced late_low late_high}/{balanced late_low late_high ring24 serpentine_tile dma_stride}/g' scripts/registered_smoke.tcl scripts/routed_integration.tcl
 sed -i '/read_verilog "\/study\/wrapper\/\$mode.v"/i read_verilog "/study/mapped/$mode.v"' scripts/registered_smoke.tcl
+# Remove only zero-terminal supply placeholders created by RTL mapping before
+# TritonRoute; do not remove or relabel any connected supply net.
+sed -i '/read_db "\$out\/placed.odb"/a source "/study/scripts/remove_empty_supply_placeholders.tcl"' scripts/routed_integration.tcl
 for kind in ring24 serpentine_tile dma_stride; do
  python3 scripts/generate_synthesized_rtl_wrappers.py "$kind" "$word_size" "wrapper/$kind.v" "producer/$kind.v"
  test -s "mapped/$kind.v"
