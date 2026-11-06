@@ -35,3 +35,18 @@ Can physical timing context of enclosing logic change which same-interface ORRAM
 
 ## Chat instruction
 The user requests continued execution of GitHub-supported milestones without repeated prompting, stopping at indispensable local OpenROAD work, and discussion of GO/NO-GO only after meaningful feasibility gates. Do not describe any workflow as complete unless its GitHub run has reached a successful conclusion. Preserve raw reports, negative results, controls, and provenance.
+
+
+## Updated continuation after synthesized RTL generalization milestone — November 5, 2026
+
+**Current controlling result:** [Synthesized RTL generalization and implementation cost final report](SYNTHESIZED_RTL_GENERALIZATION_AND_COST_FINAL_2026-11-05.md).
+
+- Yosys/ABC Nangate-mapped RTL generated from three application-inspired address producers (circular ring, serpentine tile, DMA stride). Functional mapped combinational logic passed SAT equivalence for all three source modules. [Frozen producer timing and choices, run 42138305712](https://github.com/gowthamsaid/ORRAM-Context-Aware-Memory-Research/actions/runs/42138305712).
+- [Postroute matched physical run 42139114830](https://github.com/gowthamsaid/ORRAM-Context-Aware-Memory-Research/actions/runs/42139114830) passed for 32x8 and 32x16, two physical seeds each, both decoder architectures, using unchanged pre-registered predictions.
+- [Frozen scoring and timing-cost run 42139806379](https://github.com/gowthamsaid/ORRAM-Context-Aware-Memory-Research/actions/runs/42139806379) passed. Predictor **9/12 correct**, dual-placement selector **11/12**, and blind word decoder **11/12**; predictor mean regret **2.987 ps**, max regret **20.681 ps**, mean gain over blind word **+0.1275 ps**.
+- Measured implementation-stage runtime (seconds per case): blind word 14.642, selected candidate 14.499, dual placement 15.853, two complete routes 28.749. These are Docker stage wall times **excluding calibration and prediction setup**. No end-to-end speedup was demonstrated.
+- A zero-terminal ground placeholder created by synthesis was safely removed from the OpenDB routing copy before physical implementation; connected power/ground nets were explicitly preserved.
+- **Milestone closed as complete. Scientific GO:** address-context ranking reversal and mechanism-supported sensitivity. **Algorithmic NO-GO:** these results do not show a reliable or cheaper general-purpose predictor. Do **not** revise the frozen choices on these observed labels and present them as new holdouts.
+- Faculty report can fairly emphasize transparent experimental method and original negative results, but should not advertise a published or validated efficient EDA tool.
+
+The next truly separate algorithm-development experiment must include a richer width-/slew-/load-sensitive memory timing model and independent held-out address RTL, not additional unreported retuning of this completed dataset.
