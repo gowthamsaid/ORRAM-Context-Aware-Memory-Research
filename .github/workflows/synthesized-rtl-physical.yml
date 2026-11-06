@@ -1,6 +1,9 @@
 name: ORRAM synthesized application RTL physical holdout
 
 on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/synthesized-rtl-physical.yml", "scripts/prepare_synthesized_holdout.sh", "scripts/remove_empty_supply_placeholders.tcl"]
   workflow_run:
     workflows: [ORRAM freeze synthesized RTL predictor before physical holdout]
     types: [completed]
@@ -15,7 +18,7 @@ env:
 
 jobs:
   physical-repeatability:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -28,7 +31,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          FROZEN_RUN: ${{ github.event.workflow_run.id }}
+          FROZEN_RUN: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.id || 42138305712 }}
         run: |
           set -euo pipefail
           gh run download "$FROZEN_RUN" --name "orram-synthesized-rtl-frozen-$FROZEN_RUN" --dir .
