@@ -24,6 +24,11 @@ def read(path):
         raise ValueError(f"Missing or empty evidence: {path}")
     return path.read_text(errors="replace")
 
+def normalized_sdc(sdc):
+    """Ignore only OpenSTA write_sdc run timestamp; preserve every constraint."""
+    return "\n".join(line for line in sdc.splitlines()
+        if not re.match(r"^# (Mon|Tue|Wed|Thu|Fri|Sat|Sun) ",line)).strip()
+
 def first_path(path):
     content = read(path)
     if "Startpoint:" not in content or "Endpoint:" not in content:
@@ -95,7 +100,7 @@ for size in ("32x8", "32x16"):
                     "placement_read_slack_ns":place_path["slack_ns"],
                     "read_launch":read_path["start"],"read_endpoint":read_path["end"],
                     "overall_launch":overall_path["start"],"overall_endpoint":overall_path["end"],
-                    "sdc_sha256":hashlib.sha256(sdc.encode()).hexdigest(),
+                    "sdc_sha256":hashlib.sha256(normalized_sdc(sdc).encode()).hexdigest(),
                     "spef_bytes":found["routed.spef"],
                     "routed_odb_bytes":found["routed.odb"],
                     "route_drc_bytes":(p/"route_drc.rpt").stat().st_size if (p/"route_drc.rpt").exists() else None,
