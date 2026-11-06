@@ -31,15 +31,18 @@ jobs:
           git clone -q --filter=blob:none https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts.git /tmp/orfs
           git -C /tmp/orfs checkout -q "$ORFS_REV"
           docker pull -q "$ORFS_IMAGE"
+      - name: Install and record Yosys synthesis toolchain
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq yosys
+          yosys -V | tee yosys.version
       - name: Yosys ABC mapping plus equivalence proof independent of physical outcomes
         run: |
           set -euo pipefail
           mkdir -p mapped proof wrapper producer presta
           for kind in ring24 serpentine_tile dma_stride; do
-            docker run --rm --user "$(id -u):$(id -g)" \
-              -v /tmp/orfs/flow:/OpenROAD-flow-scripts/flow \
-              -v "$PWD:/study" -w /study "$ORFS_IMAGE" \
-              bash scripts/synthesize_address_rtl.sh "rtl_applications/$kind.v" "mapped/$kind.v" "proof/$kind.log"
+            bash scripts/synthesize_address_rtl.sh "rtl_applications/$kind.v" "mapped/$kind.v" "proof/$kind.log"
             python3 scripts/generate_synthesized_rtl_wrappers.py "$kind" 8 "wrapper/$kind.v" "producer/$kind.v"
             test -s "mapped/$kind.v"
           done
@@ -72,6 +75,7 @@ jobs:
           path: |
             mapped/
             proof/
+            yosys.version
             wrapper/
             producer/
             presta/
