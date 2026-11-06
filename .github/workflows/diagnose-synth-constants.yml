@@ -1,0 +1,30 @@
+name: ORRAM diagnostic of mapped constant ground routing failure
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/diagnose-synth-constants.yml"]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recover failed placed DEF and inspect grounded nets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p failed frozen
+          gh run download 42138571460 --name orram-synth-rtl-holdout-8-42138571460 --dir failed
+          gh run download 42138305712 --name orram-synthesized-rtl-frozen-42138305712 --dir frozen
+          ls failed/integration/row/ring24/s11/
+          echo '---- ZERO MAP ----'
+          grep -n -C 8 -E 'zero_|LOGIC0_X1|LOGIC1_X1' frozen/mapped/ring24.v | head -n 120 || true
+          echo '---- ZERO DEF ----'
+          grep -n -C 8 'u_addr_gen/zero_' failed/integration/row/ring24/s11/placed.def | head -n 120 || true
+          echo '---- TYPE ----'
+          grep -n -C 3 -E '\+ USE GROUND|\+ USE POWER|SPECIALNETS' failed/integration/row/ring24/s11/placed.def | head -n 90 || true
