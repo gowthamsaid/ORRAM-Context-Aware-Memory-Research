@@ -1,0 +1,26 @@
+name: M5 investigate architecture SDC differences
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/m5-sdc-diff.yml"]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch archived SDCs and determine real differences
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          mkdir -p sample
+          gh run download 42139114830 --name orram-synth-rtl-holdout-8-42139114830 --dir sample
+          echo '---- DIFF ----'
+          diff -u sample/integration/row/ring24/s11/top.sdc sample/integration/word/ring24/s11/top.sdc | head -n 130 || true
+          echo '---- ROW ----'
+          sed -n '1,110p' sample/integration/row/ring24/s11/top.sdc
+          echo '---- WORD ----'
+          sed -n '1,110p' sample/integration/word/ring24/s11/top.sdc
