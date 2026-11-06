@@ -24,7 +24,7 @@ jobs:
           gh run download "$HOLDOUT_RUN" --name "orram-synth-rtl-holdout-8-$HOLDOUT_RUN" --dir physical/32x8
           gh run download "$HOLDOUT_RUN" --name "orram-synth-rtl-holdout-16-$HOLDOUT_RUN" --dir physical/32x16
           test -s physical/32x8/frozen/predictions.csv
-          test -s physical/32x16/integration/row/gray_decode/s23/routed.spef
+          test -s physical/32x16/integration/row/dma_stride/s23/routed.spef
       - name: Quantify timing regret versus routed oracle
         run: |
           set -euo pipefail
