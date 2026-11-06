@@ -70,7 +70,9 @@ for size in ("32x8", "32x16"):
                                 "set_clock_uncertainty"):
                     if command not in sdc:
                         failures.append(f"{p}: SDC missing {command}")
-                checks = read(p/"setup_check.rpt")
+                checks = (p/"setup_check.rpt").read_text(errors="replace")
+                if not checks.strip():
+                    warnings.append(f"{p}: check_setup report empty; serialized report cannot prove path coverage")
                 if re.search(r"(?i)unconstrained endpoints|no clock|no input delay|no output delay",checks):
                     warnings.append(f"{p}: placement check_setup contains potential unconstrained-path warning; manual Tcl check needed")
                 try:
