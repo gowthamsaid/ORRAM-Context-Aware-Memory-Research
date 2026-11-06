@@ -1,0 +1,79 @@
+name: ORRAM freeze synthesized RTL predictor before physical holdout
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/freeze-synthesized-rtl.yml", "scripts/synthesize_address_rtl.sh"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+env:
+  ORFS_REV: d056a2b304182bf76ff10653531165b1dd9848d4
+  ORFS_IMAGE: openroad/orfs@sha256:641c6870a2c64143464d46017dd25ab647900fd29dce502230a2db0682e69bc9
+jobs:
+  freeze:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download calibration from prior balanced 32x8 seed11 only
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p calibration
+          gh run download 42128929892 --name orram-memory-sensitivity-three-seed-42128929892 --dir calibration
+          test -s calibration/boundary_suffix_paths.csv
+      - name: Restore pinned physical and synthesis container
+        run: |
+          set -euo pipefail
+          git clone -q --filter=blob:none https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts.git /tmp/orfs
+          git -C /tmp/orfs checkout -q "$ORFS_REV"
+          docker pull -q "$ORFS_IMAGE"
+      - name: Yosys ABC mapping plus equivalence proof independent of physical outcomes
+        run: |
+          set -euo pipefail
+          mkdir -p mapped proof wrapper producer presta
+          for kind in ring24 serpentine_tile dma_stride; do
+            docker run --rm --user "$(id -u):$(id -g)" \
+              -v /tmp/orfs/flow:/OpenROAD-flow-scripts/flow \
+              -v "$PWD:/study" -w /study "$ORFS_IMAGE" \
+              bash scripts/synthesize_address_rtl.sh "rtl_applications/$kind.v" "mapped/$kind.v" "proof/$kind.log"
+            python3 scripts/generate_synthesized_rtl_wrappers.py "$kind" 8 "wrapper/$kind.v" "producer/$kind.v"
+            test -s "mapped/$kind.v"
+          done
+      - name: Independent preplacement STA of exactly the same mapped producer
+        run: |
+          set -euo pipefail
+          for kind in ring24 serpentine_tile dma_stride; do
+            mkdir -p "presta/$kind"
+            docker run --rm --user "$(id -u):$(id -g)" \
+              -v /tmp/orfs/flow:/OpenROAD-flow-scripts/flow \
+              -v "$PWD:/study" -w /OpenROAD-flow-scripts/flow \
+              -e PRODUCER_DESIGN="/study/producer/$kind.v" \
+              -e PRODUCER_MAPPED="/study/mapped/$kind.v" \
+              -e PRODUCER_STA_OUT="/study/presta/$kind" "$ORFS_IMAGE" \
+              bash -lc 'source ../env.sh && openroad -exit /study/scripts/synthesized_producer_sta.tcl' \
+              > "presta/$kind/sta.log" 2>&1 || { tail -n 100 "presta/$kind/sta.log"; exit 1; }
+            grep "PRODUCER_PREPLACEMENT_STA_PASS" "presta/$kind/sta.log"
+          done
+      - name: Freeze prospective six architecture decisions
+        run: |
+          set -euo pipefail
+          python3 scripts/freeze_synthesized_rtl_predictor.py calibration/boundary_suffix_paths.csv presta frozen
+          cat frozen/predictions.csv
+          sha256sum mapped/*.v rtl_applications/*.v frozen/* > frozen/provenance.sha256
+      - name: Preserve frozen artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orram-synthesized-rtl-frozen-${{ github.run_id }}
+          path: |
+            mapped/
+            proof/
+            wrapper/
+            producer/
+            presta/
+            frozen/
+          retention-days: 90
