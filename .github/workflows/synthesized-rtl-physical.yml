@@ -1,6 +1,9 @@
 name: ORRAM synthesized application RTL physical holdout
 
 on:
+  workflow_run:
+    workflows: [ORRAM freeze synthesized RTL predictor before physical holdout]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -12,6 +15,7 @@ env:
 
 jobs:
   physical-repeatability:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -24,9 +28,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          FROZEN_RUN: ${{ github.event.workflow_run.id }}
         run: |
           set -euo pipefail
-          gh run download FROZEN_RUN_ID --name orram-synthesized-rtl-frozen-FROZEN_RUN_ID --dir .
+          gh run download "$FROZEN_RUN" --name "orram-synthesized-rtl-frozen-$FROZEN_RUN" --dir .
           test -s mapped/ring24.v
           test -s frozen/predictions.csv
       - name: Build matched wrappers using only archived synthesized cell netlists
@@ -112,5 +117,7 @@ jobs:
           path: |
             integration/
             wrapper/
+            frozen/
+            yosys.version
           if-no-files-found: warn
           retention-days: 90
