@@ -69,7 +69,7 @@ Each run can be opened at:
 
 **Result D — implementation cost.** Mean sequential placement and route wall times: 14.642 s for one blind word, 14.499 s for predicted one candidate, 15.853 s for two placements and one route, and 28.749 s for both full routes. These are *stage-level* measurements; reference calibration and additional model generation are not included, so a net cost improvement has **not** been established.
 
-**Result E — integrity and limits.** The preliminary M5 archive audit checked 24 artifacts and 12 matched pairs with 12/12 agreement between targeted read and overall worst-setup winner. Row/word SDC source differences were only write-time comments. An empty serialized setup-check report prompted a new explicit postroute OpenSTA `check_setup -verbose` rerun. This report must be amended with the precise recheck verdict before treating M5 as closed.
+**Result E — integrity and limits.** The preliminary M5 archive audit checked 24 artifacts and 12 matched pairs with 12/12 agreement between targeted read and overall worst-setup winner. Row/word SDC source differences were only write-time comments. An empty serialized setup-check report prompted a fresh explicit postroute OpenSTA `check_setup -verbose` rerun. **M5 is closed for the scoped exploratory STA audit:** all 24 ODB/SDC/SPEF rechecks passed; all 24 check_setup markers were verified without reported setup errors or warning matches. The check command was silent, so signoff-grade constraint completeness is **not** independently proven. See M5 audit.
 
 ## 6. Related work and novelty
 
@@ -114,7 +114,7 @@ Full evidence:
 - All final prediction labels and implementation stage durations: Actions 42139806379
 - M5 original-constraint equivalence: Actions 42144434576
 - M5 archived physical audit: Actions 42144508832
-- Postroute STA coverage audit: see [M5 audit](M5_POSTROUTE_INTEGRITY_2026-11-05.md) when completed.
+- Postroute STA coverage audit: see [M5 audit](M5_POSTROUTE_INTEGRITY_2026-11-05.md) now completed.
 
 ## 10. Conclusion
 
