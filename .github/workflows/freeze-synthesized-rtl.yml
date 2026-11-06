@@ -30,7 +30,6 @@ jobs:
           set -euo pipefail
           git clone -q --filter=blob:none https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts.git /tmp/orfs
           git -C /tmp/orfs checkout -q "$ORFS_REV"
-          docker pull -q "$ORFS_IMAGE"
       - name: Install and record Yosys synthesis toolchain
         run: |
           set -euo pipefail
@@ -46,6 +45,8 @@ jobs:
             python3 scripts/generate_synthesized_rtl_wrappers.py "$kind" 8 "wrapper/$kind.v" "producer/$kind.v"
             test -s "mapped/$kind.v"
           done
+      - name: Restore pinned OpenROAD container only after successful equivalence
+        run: docker pull -q "$ORFS_IMAGE"
       - name: Independent preplacement STA of exactly the same mapped producer
         run: |
           set -euo pipefail
