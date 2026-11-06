@@ -33,7 +33,7 @@ jobs:
       - name: Install and record Yosys synthesis toolchain
         run: |
           set -euo pipefail
-          sudo apt-get update -qq
+          # Runner apt indices are preconfigured; avoid indefinite mirror refresh.
           sudo apt-get install -y -qq yosys
           yosys -V | tee yosys.version
       - name: Yosys ABC mapping plus equivalence proof independent of physical outcomes
