@@ -34,7 +34,16 @@ jobs:
         run: |
           set -euo pipefail
           # Runner apt indices are preconfigured; avoid indefinite mirror refresh.
-          sudo apt-get install -y -qq yosys
+          if ! command -v yosys >/dev/null; then
+            if ! timeout 50s sudo apt-get install -y -qq yosys; then
+              python3 -m pip install --user yowasp-yosys
+              mkdir -p "$HOME/.local/bin"
+              printf '#!/usr/bin/env bash\nexec "$HOME/.local/bin/yowasp-yosys" "$@"\n' > "$HOME/.local/bin/yosys"
+              chmod +x "$HOME/.local/bin/yosys"
+              echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+              export PATH="$HOME/.local/bin:$PATH"
+            fi
+          fi
           yosys -V | tee yosys.version
       - name: Yosys ABC mapping plus equivalence proof independent of physical outcomes
         run: |
