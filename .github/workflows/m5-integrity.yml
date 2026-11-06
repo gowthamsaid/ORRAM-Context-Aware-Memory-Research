@@ -1,0 +1,38 @@
+name: M5 ORRAM physical evidence integrity audit
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/m5-integrity.yml", "scripts/m5_serialized_evidence_audit.py"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recover exact successful synthesized RTL physical artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p physical/32x8 physical/32x16
+          gh run download 42139114830 --name orram-synth-rtl-holdout-8-42139114830 --dir physical/32x8
+          gh run download 42139114830 --name orram-synth-rtl-holdout-16-42139114830 --dir physical/32x16
+          test -s physical/32x8/integration/row/ring24/s11/routed.spef
+          test -s physical/32x16/integration/word/dma_stride/s23/routed.spef
+      - name: Audit pair constraints, target paths and whole-design paths
+        run: |
+          set -euo pipefail
+          python3 scripts/m5_serialized_evidence_audit.py physical m5
+          cat m5/integrity_summary.json
+      - name: Preserve detailed output regardless of verdict
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orram-m5-integrity-${{ github.run_id }}
+          path: m5/
+          retention-days: 90
