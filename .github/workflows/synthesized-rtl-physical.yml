@@ -1,0 +1,116 @@
+name: ORRAM synthesized application RTL physical holdout
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+env:
+  ORFS_REV: d056a2b304182bf76ff10653531165b1dd9848d4
+  ORFS_IMAGE: openroad/orfs@sha256:641c6870a2c64143464d46017dd25ab647900fd29dce502230a2db0682e69bc9
+
+jobs:
+  physical-repeatability:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        word_size: [8, 16]
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore immutable proven mapped RTL and frozen predictions
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh run download FROZEN_RUN_ID --name orram-synthesized-rtl-frozen-FROZEN_RUN_ID --dir .
+          test -s mapped/ring24.v
+          test -s frozen/predictions.csv
+      - name: Build matched wrappers using only archived synthesized cell netlists
+        run: |
+          set -euo pipefail
+          bash scripts/prepare_synthesized_holdout.sh '${{ matrix.word_size }}'
+          python3 -m py_compile scripts/generate_synthesized_rtl_wrappers.py
+      - name: Rebuild pinned environment
+        run: |
+          set -euo pipefail
+          git clone -q --filter=blob:none https://github.com/The-OpenROAD-Project/OpenROAD-flow-scripts.git /tmp/orfs
+          git -C /tmp/orfs checkout -q "$ORFS_REV"
+          docker pull -q "$ORFS_IMAGE"
+      - name: Rebuild ORRAM physical memories locally rather than downloading Actions artifacts
+        run: |
+          set -euo pipefail
+          for arch in row word; do
+            mkdir -p "archive/results/$arch" "audit/$arch"
+            docker run --rm --user "$(id -u):$(id -g)" \
+              -v /tmp/orfs/flow:/OpenROAD-flow-scripts/flow \
+              -v "$PWD:/study" -w /OpenROAD-flow-scripts/flow \
+              -e ORRAM_VARIANT="$arch" \
+              -e ORRAM_OUTPUT_DIR="/study/archive/results/$arch" "$ORFS_IMAGE" \
+              bash -lc 'source ../env.sh && openroad -exit /study/scripts/generate_ram.tcl' \
+              > "archive/results/$arch/generation.log" 2>&1 || {
+                tail -n 120 "archive/results/$arch/generation.log"
+                exit 1
+              }
+            docker run --rm --user "$(id -u):$(id -g)" \
+              -v /tmp/orfs/flow:/OpenROAD-flow-scripts/flow \
+              -v "$PWD:/study" -w /OpenROAD-flow-scripts/flow \
+              -e ORRAM_VARIANT="$arch" "$ORFS_IMAGE" \
+              bash -lc 'source ../env.sh && openroad -exit /study/scripts/milestone1_audit.tcl' \
+              > "audit/$arch/console.log" 2>&1 || {
+                tail -n 120 "audit/$arch/console.log"
+                exit 1
+              }
+            cp "audit/$arch/ram_structural.v" "archive/results/$arch/ram_structural.v"
+            test -s "archive/results/$arch/ram_structural.v"
+          done
+          python3 scripts/check_architectures.py archive/results audit/contract
+          sha256sum archive/results/{row,word}/behavioral.v archive/results/{row,word}/ram_structural.v
+      - name: Three explicitly seeded matched implementations per configuration
+        run: |
+          set -euo pipefail
+          for seed in 11 23; do
+            for mode in ring24 serpentine_tile dma_stride; do
+              for arch in row word; do
+                folder="integration/$arch/$mode/s$seed"
+                mkdir -p "$folder"
+                /usr/bin/time -f "%e" -o "$folder/place_seconds.txt" docker run --rm --user "$(id -u):$(id -g)" \
+                  -v /tmp/orfs/flow:/OpenROAD-flow-scripts/flow \
+                  -v "$PWD:/study" -w /OpenROAD-flow-scripts/flow \
+                  -e ORRAM_VARIANT="$arch" -e ORRAM_WRAPPER="$mode" \
+                  -e ORRAM_SEED="$seed" \
+                  -e ORRAM_INTEGRATION_OUT="/study/$folder" "$ORFS_IMAGE" \
+                  bash -lc 'source ../env.sh && openroad -exit /study/scripts/registered_smoke.tcl' \
+                  > "$folder/placement.log" 2>&1 || {
+                    tail -n 120 "$folder/placement.log"
+                    exit 1
+                  }
+                test -s "$folder/placed.def"
+                /usr/bin/time -f "%e" -o "$folder/route_seconds.txt" docker run --rm --user "$(id -u):$(id -g)" \
+                  -v /tmp/orfs/flow:/OpenROAD-flow-scripts/flow \
+                  -v "$PWD:/study" -w /OpenROAD-flow-scripts/flow \
+                  -e ORRAM_VARIANT="$arch" -e ORRAM_WRAPPER="$mode" \
+                  -e ORRAM_INTEGRATION_OUT="/study/$folder" "$ORFS_IMAGE" \
+                  bash -lc 'source ../env.sh && openroad -exit /study/scripts/routed_integration.tcl' \
+                  > "$folder/routing.log" 2>&1 || {
+                    tail -n 120 "$folder/routing.log"
+                    exit 1
+                  }
+                test -s "$folder/routed.spef"
+              done
+            done
+          done
+          echo 'LOCKED_HOLDOUT_COMPLETE'
+      - name: Archive every checkpoint and statistical table
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orram-synth-rtl-holdout-${{ matrix.word_size }}-${{ github.run_id }}
+          path: |
+            integration/
+            wrapper/
+          if-no-files-found: warn
+          retention-days: 90
