@@ -6,6 +6,7 @@ The root [README](../README.md) explains the research question and headline find
 
 | Document | Purpose |
 |---|---|
+| [Negative findings and failed experimental gates](NEGATIVE_RESULTS_AND_FAILURES.md) | Distinguishes scientific failures and negative conclusions from corrected CI problems |
 | [Faculty briefing](START_HERE.md) | 2–3 minute overview of hypotheses, result, limitations and requested feedback |
 | [Complete research report](M10_FACULTY_RESEARCH_REPORT_2026-11-05.md) | Controlled setup, full results, negative predictor outcome and novelty discussion |
 | [Experiment and raw-evidence index](EXPERIMENT_EVIDENCE_INDEX.md) | Chronological successful run IDs and original experimental sources |
