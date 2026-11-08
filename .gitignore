@@ -1,0 +1,19 @@
+# Generated Python and simulation outputs
+__pycache__/
+*.py[cod]
+*.vvp
+*.vcd
+
+# Physical-flow output directories produced locally; original experimental
+# evidence is archived in GitHub Actions, not replicated in the source tree.
+artifacts/
+integration/
+wrapper/
+generated/
+stage_reports/
+flow-results/
+*.odb
+*.def
+*.spef
+*.gds
+*.log
