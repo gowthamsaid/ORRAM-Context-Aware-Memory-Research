@@ -31,12 +31,13 @@ The experiments support a **bounded, reproducible observation of context-sensiti
 
 ## Suggested reading order
 
-1. [Full faculty technical report](M10_FACULTY_RESEARCH_REPORT_2026-11-05.md) — hypotheses, controls, numerical outcomes, and limitations.
-2. [Final 12-case held-out comparison](../results/synthesized_rtl_holdout_pairs.csv) and [interpretation](SYNTHESIZED_RTL_GENERALIZATION_AND_COST_FINAL_2026-11-05.md).
-3. [Address-pin sensitivity mechanism](ORRAM_THREE_SEED_ADDRESS_SENSITIVITY_2026-11-05.md).
-4. [Post-route physical evidence audit](M5_POSTROUTE_INTEGRITY_2026-11-05.md).
-5. [Literature and novelty assessment](M9_LITERATURE_AND_NOVELTY_REVIEW_2026-11-05.md).
-6. [Completed workflow-run evidence](EXPERIMENT_EVIDENCE_INDEX.md).
+1. [Negative results and failure classification](NEGATIVE_RESULTS_AND_FAILURES.md) — explicit failed scientific criteria, corrected CI errors, and final NO-GO.
+3. [Full faculty technical report](M10_FACULTY_RESEARCH_REPORT_2026-11-05.md) — hypotheses, controls, numerical outcomes, and limitations.
+3. [Final 12-case held-out comparison](../results/synthesized_rtl_holdout_pairs.csv) and [interpretation](SYNTHESIZED_RTL_GENERALIZATION_AND_COST_FINAL_2026-11-05.md).
+4. [Address-pin sensitivity mechanism](ORRAM_THREE_SEED_ADDRESS_SENSITIVITY_2026-11-05.md).
+5. [Post-route physical evidence audit](M5_POSTROUTE_INTEGRITY_2026-11-05.md).
+6. [Literature and novelty assessment](M9_LITERATURE_AND_NOVELTY_REVIEW_2026-11-05.md).
+7. [Completed workflow-run evidence](EXPERIMENT_EVIDENCE_INDEX.md).
 
 ## Questions for faculty feedback
 

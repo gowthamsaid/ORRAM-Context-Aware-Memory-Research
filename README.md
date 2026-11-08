@@ -6,7 +6,7 @@
 
 **Completed exploratory study (November 2026).** The experiments found **context-dependent reversals in timing preference** for certain matched row/word implementations. However, the final pre-placement architecture predictor chose the best option in only **9 of 12** synthesized-RTL cases, versus **11 of 12** for a simple always-word baseline. **The physical phenomenon is supported within the tested conditions; a generally useful or faster architecture-selection algorithm has not been established.** This is research-in-progress for faculty feedback, not a publication or a claim to have invented ORRAM.
 
-**Start here:** [One-page research briefing](docs/START_HERE.md) · [Full faculty report](docs/M10_FACULTY_RESEARCH_REPORT_2026-11-05.md) · [Experiments and evidence](docs/EXPERIMENT_EVIDENCE_INDEX.md) · [Final 12-case dataset](results/synthesized_rtl_holdout_pairs.csv) · [Reproduction guide](docs/REPRODUCIBILITY.md)
+**Start here:** [One-page research briefing](docs/START_HERE.md) · [Negative results and failed gates](docs/NEGATIVE_RESULTS_AND_FAILURES.md) · [Full faculty report](docs/M10_FACULTY_RESEARCH_REPORT_2026-11-05.md) · [Experiments and evidence](docs/EXPERIMENT_EVIDENCE_INDEX.md) · [Final 12-case dataset](results/synthesized_rtl_holdout_pairs.csv) · [Reproduction guide](docs/REPRODUCIBILITY.md)
 
 ## 1. Experimental approach
 
