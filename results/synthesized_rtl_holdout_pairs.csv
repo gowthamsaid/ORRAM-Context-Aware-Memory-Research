@@ -1,0 +1,13 @@
+word_width_bits,address_rtl,placement_seed,row_minus_word_setup_slack_ps,frozen_prediction,routed_winner,prediction_correct,oracle_regret_ps
+8,ring24,11,-39.467,word,word,1,0.000
+8,ring24,23,-10.475,word,word,1,0.000
+8,serpentine_tile,11,37.375,row,row,1,0.000
+8,serpentine_tile,23,-4.671,row,word,0,4.671
+8,dma_stride,11,-17.100,word,word,1,0.000
+8,dma_stride,23,-20.940,word,word,1,0.000
+16,ring24,11,-31.991,word,word,1,0.000
+16,ring24,23,-15.987,word,word,1,0.000
+16,serpentine_tile,11,-20.681,row,word,0,20.681
+16,serpentine_tile,23,-10.493,row,word,0,10.493
+16,dma_stride,11,-49.778,word,word,1,0.000
+16,dma_stride,23,-21.840,word,word,1,0.000
